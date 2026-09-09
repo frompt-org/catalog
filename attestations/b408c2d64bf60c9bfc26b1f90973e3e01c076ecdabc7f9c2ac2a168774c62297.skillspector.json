@@ -1,0 +1,23 @@
+{
+ "attestation": 1,
+ "authority": "skillspector",
+ "authority_version": "SkillSpector v2.11.1",
+ "coverage_percent": 100.0,
+ "digest": "b408c2d64bf60c9bfc26b1f90973e3e01c076ecdabc7f9c2ac2a168774c62297",
+ "id": "handoff-note",
+ "issues": [
+  {
+   "category": "Supply Chain",
+   "confidence": 0.9,
+   "id": "SC2",
+   "line": 68,
+   "rule": null,
+   "severity": "HIGH"
+  }
+ ],
+ "kind": "static-scan",
+ "observed_at": "2026-09-09T02:28:50Z",
+ "score": 22,
+ "severity": "MEDIUM",
+ "version": "1.1.0"
+}

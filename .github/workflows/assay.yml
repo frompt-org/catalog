@@ -1,0 +1,44 @@
+# assay -- observe every changed document with SkillSpector and record what it saw.
+#
+# This is an authority in the FPA.md 15 sense: observations keyed by digest, as
+# data, never a verdict. The job never fails on a score. It fails only when it
+# could not scan, because an attestation for a partial scan is a lie.
+name: assay
+on:
+  push:
+    branches: [main]
+    paths: ['prompts/**/*.prompt.md']
+  pull_request:
+    paths: ['prompts/**/*.prompt.md']
+permissions:
+  contents: write
+jobs:
+  assay:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v3
+      - run: uv tool install git+https://github.com/NVIDIA/skillspector.git
+      - name: changed documents
+        id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha || github.event.before }}"
+          git diff --name-only "$base" HEAD -- 'prompts/**/*.prompt.md' | tr '\n' ' ' > changed.txt
+          echo "docs=$(cat changed.txt)" >> "$GITHUB_OUTPUT"
+      - name: attest
+        run: |
+          for f in ${{ steps.changed.outputs.docs }}; do
+            [ -f "$f" ] && bin/fp-assay "$f" -o attestations
+          done
+      - name: show
+        run: |
+          for f in $(git status --porcelain attestations | awk '{print $2}' | grep -v /raw/); do
+            python3 -c "import json,sys; a=json.load(open(sys.argv[1])); print(a['id'], a['version'], a['digest'][:12], 'score', a['score'], a['severity'], 'issues', len(a['issues']))" "$f"
+          done
+      - name: commit attestations
+        if: github.event_name == 'push'
+        run: |
+          git config user.name assay && git config user.email assay@f-prompts
+          git add attestations && git diff --cached --quiet || git commit -m "assay: attestations for ${{ steps.changed.outputs.docs }}" && git push
