@@ -1,16 +1,24 @@
 {
  "attestation": 1,
  "authority": "skillspector",
- "authority_version": "SkillSpector v2.11.2",
+ "authority_version": "SkillSpector v2.11.1",
  "coverage_percent": 100.0,
- "digest": "e495a52bcaa6c67b4eed0f227511237b53101143e43c8882d17d029c2917e643",
+ "digest": "d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5",
  "id": "fpa-bootstrap",
  "issues": [
+  {
+   "category": "Prompt Injection",
+   "confidence": 0.7,
+   "id": "P2",
+   "line": 1,
+   "rule": null,
+   "severity": "HIGH"
+  },
   {
    "category": "Excessive Agency",
    "confidence": 0.75,
    "id": "EA2",
-   "line": 42,
+   "line": 45,
    "rule": null,
    "severity": "MEDIUM"
   },
@@ -18,7 +26,7 @@
    "category": "Rogue Agent",
    "confidence": 0.65,
    "id": "RA2",
-   "line": 60,
+   "line": 66,
    "rule": null,
    "severity": "MEDIUM"
   },
@@ -26,7 +34,7 @@
    "category": "Rogue Agent",
    "confidence": 0.65,
    "id": "RA2",
-   "line": 77,
+   "line": 82,
    "rule": null,
    "severity": "MEDIUM"
   },
@@ -34,14 +42,14 @@
    "category": "Supply Chain",
    "confidence": 0.9,
    "id": "SC2",
-   "line": 90,
+   "line": 95,
    "rule": null,
    "severity": "HIGH"
   }
  ],
  "kind": "static-scan",
- "observed_at": "2026-09-09T22:20:12Z",
- "score": 39,
- "severity": "MEDIUM",
- "version": "2.0.0"
+ "observed_at": "2026-09-09T22:39:31Z",
+ "score": 57,
+ "severity": "HIGH",
+ "version": "2.1.0"
 }

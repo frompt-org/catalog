@@ -30,10 +30,12 @@ The key's fingerprint is `SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY`. T
 That writes one line to `fpa.registered` -- catalog, key fingerprint, pin mode, when, who -- and that line is the consent. From then on:
 
 ```bash
-fp-resolve pr-review@latest              # newest version, bytes verified against the manifest
-fp-resolve pr-review@2.0.0               # exactly that one
-fp-verify  pr-review --from gh:frompt-org/stable@main   # the managed path: signature, expiry, serial, digest
+fp-resolve pr-review@latest --from gh:frompt-org/stable@main   # this catalog's manifest, bytes verified against it
+fp-resolve pr-review@2.0.0  --from gh:frompt-org/stable@main   # exactly that one
+fp-verify  pr-review        --from gh:frompt-org/stable@main   # the managed path: signature, expiry, serial, digest
 ```
+
+`--from` is what makes it *this* catalog: without it a resolver reads whatever index sits in its own checkout, which is a different publisher. The pin mode you registered with is enforced by the resolver — `latest` floats; `version` and `digest` require a matching line in `fpa.lock`, and re-pinning is a change somebody reviews.
 
 **Do not take `allowed_signers` from this repository at verification time.** A key fetched from the same host as the signature it validates proves only that the two agree with each other. Copy it once, out of band, and pin it.
 
