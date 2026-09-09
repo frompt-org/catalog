@@ -32,6 +32,16 @@ jobs:
           for f in ${{ steps.changed.outputs.docs }}; do
             [ -f "$f" ] && bin/fp-assay "$f" -o attestations
           done
+      - name: prune attestations for bytes this catalog no longer serves
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          idx = {v["digest"] for p in json.load(open("index.json"))["prompts"] for v in p["versions"]}
+          for d in ("attestations", "attestations/raw"):
+              for f in pathlib.Path(d).glob("*.json"):
+                  if f.name.split(".")[0] not in idx:
+                      f.unlink(); print("pruned", f)
+          PY
       - name: show
         run: |
           for f in $(git status --porcelain attestations | awk '{print $2}' | grep -v /raw/); do
