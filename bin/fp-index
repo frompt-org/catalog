@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""fp-index — regenerate INDEX.md and index.json from the prompts in prompts/.
+
+Publishes each prompt's digest, which is the one part of a confirmation phrase a
+document cannot contain. Deliberately does NOT publish consent sentences: the
+index gives you part 3, the document gives you part 1, and you need both. An
+index that handed over a whole phrase would be a copy-paste machine for the
+ceremony this protocol exists to create.
+
+    fp-index            # rewrite INDEX.md
+    fp-index --check    # exit 1 if INDEX.md is stale (used by fp-selftest)
+"""
+import datetime
+import hashlib
+import json
+import os
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+RAW = "https://raw.githubusercontent.com/f-prompts/stable/main/prompts"
+
+SUMMARY = {
+    "help-me": "Stuck? It interviews your agent about this session, then proposes a route through other prompts. Start here.",
+    "repo-recon": "Maps an unfamiliar codebase from entry points, seams and git churn. Twelve reads, five sections, read-only.",
+    "pr-review": "Judges a diff by tiers — correctness, blast radius, failure mode, reversibility, design fit. No praise, no nits.",
+    "bug-repro": "Reproduces before fixing, then stops. Falsifiable claim, shortest repro, failing/passing boundary.",
+    "grill-me": "Attacks your idea instead of encouraging it. Finds the weakest load-bearing assumption and asks what would falsify it.",
+    "ticket-intake": "Takes a support intake like a good first-line engineer, then drafts one ticket a stranger could act on.",
+    "welcome-tour": "A host prompt: a company guiding a visiting agent through its services. Reads nothing of yours.",
+    "ghost-in-the-gist": "A three-move ASCII terminal game. No engine — the document is the interpreter spec.",
+    "handoff-note": "Writes the note that lets a cold reader resume your work: state, next action, decisions with reasons.",
+    "fpa-bootstrap": "Teaches the protocol itself to an agent that has never heard of it, refusals included.",
+}
+ORDER = list(SUMMARY)
+
+
+def front_matter(text):
+    fm = {}
+    for line in text.splitlines()[2:]:
+        if line.strip() == "---":
+            break
+        if ":" in line:
+            k, v = line.split(":", 1)
+            fm[k.strip()] = v.strip()
+    return fm
+
+
+def rows():
+    out = []
+    for path in sorted(ROOT.glob("prompts/*/*.prompt.md")):
+        raw = path.read_bytes()
+        fm = front_matter(raw.decode("utf-8"))
+        out.append({
+            "id": fm["id"], "version": fm["version"], "ceremony": fm["ceremony"],
+            "flow": fm["flow"], "allow": fm["allow"], "deny": fm["deny"],
+            "contexts": fm.get("contexts", "interactive"),
+            "persistence": fm.get("persistence", "none"),
+            "digest": hashlib.sha256(raw).hexdigest(),
+            "file": f"{path.parent.name}/{path.name}",
+        })
+    out.sort(key=lambda r: (ORDER.index(r["id"]) if r["id"] in ORDER else 99,
+                            semver_key(r["version"])))
+    return out
+
+
+def semver_key(v):
+    """Sort key. A prerelease sorts below the release it precedes, so `latest`
+    never lands on 2.0.0-rc.1 when 1.3.0 is the newest finished version."""
+    core, _, pre = v.partition("-")
+    nums = tuple(int(x) if x.isdigit() else 0 for x in core.split("."))
+    return nums + ((0, pre) if pre else (1, ""))
+
+
+def grouped():
+    """id -> versions, newest first, with the id's channels resolved."""
+    by_id = {}
+    for r in rows():
+        by_id.setdefault(r["id"], []).append(r)
+    for versions in by_id.values():
+        versions.sort(key=lambda r: semver_key(r["version"]), reverse=True)
+    return by_id
+
+
+def latest_of(versions):
+    """Newest release, ignoring prereleases unless there is nothing else."""
+    releases = [v for v in versions if "-" not in v["version"]]
+    return (releases or versions)[0]["version"]
+
+
+def manifest():
+    """The machine-readable half. Deterministic: no timestamps, sorted keys, so a
+    signature over it stays valid until the prompts themselves change.
+
+    `serial` is monotonic and bumps only when the prompt set changes, which gives
+    a client something to compare against. Without it, an attacker who controls
+    the serving host can replay an older bundle forever: every signature on it is
+    still perfectly valid, which is exactly what makes rollback attacks quiet.
+    """
+    body = {
+        "manifest_version": 2,
+        "protocol": "FOREIGN-PROMPT v2",
+        "base": RAW,
+        "prompts": [
+            {
+                "id": pid,
+                "latest": latest_of(versions),
+                "versions": [{k: v[k] for k in sorted(v) if k != "id"} for v in versions],
+            }
+            for pid, versions in grouped().items()
+        ],
+    }
+    # Expiry, not only monotonicity. A serial floor is a memory, and a client that
+    # has never seen a newer manifest has no floor -- a fresh agent, a wiped .fpa, a
+    # container starting clean. All of them accept an arbitrarily old signed bundle.
+    # `not_after` needs no memory: a replayed manifest dies on its own. apt calls it
+    # Valid-Until and WebPKI shortened certificate lifetimes for the same reason.
+    days = int(os.environ.get("FPA_VALIDITY_DAYS", "30"))
+    previous, serial = None, 1
+    js = ROOT / "index.json"
+    if js.exists():
+        try:
+            previous = json.loads(js.read_text())
+            serial = int(previous.get("serial", 0))
+            stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
+            if stale != body or serial < 1:
+                serial += 1
+        except (json.JSONDecodeError, ValueError):
+            serial = 1
+    body["serial"] = serial
+
+    # Keep the existing window unless the content changed or it has run out, so
+    # `--check` stays deterministic and a re-run is not a re-publication.
+    keep = None
+    if previous:
+        keep = previous.get("not_after")
+        stale = {k: v for k, v in previous.items() if k not in ("serial", "not_after")}
+        expired = keep and keep < datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if stale != {k: v for k, v in body.items() if k != "serial"} or expired or "--renew" in sys.argv:
+            keep = None
+    body["not_after"] = keep or (
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=days)
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return json.dumps(body, indent=2, sort_keys=True) + "\n"
+
+
+def build():
+
+    out = ["# Index of foreign prompts", "",
+           "Every prompt in this repo, every published version, and the digest of each one's "
+           "bytes.", "",
+           "**This index cannot give you a confirmation phrase, by design.** A phrase is a consent",
+           "sentence plus an id plus a digest. The digest is here — a document cannot contain its own",
+           "hash, so publishing it out of band is the intended route. The consent sentence is *not*:",
+           "it lives in each prompt's final `## Consent` section, which you reach by reading the",
+           "document. Index plus document gives you a phrase. Index alone does not.",
+           "",
+           "Verify a digest against what you actually fetched:",
+           "", "```", "curl -s <url> | shasum -a 256", "```",
+           "", "If it disagrees with this table, you and this index are not looking at the same",
+           "document. Do not adopt it; open an issue.", "", "---", ""]
+
+    for pid, versions in grouped().items():
+        newest = versions[0]
+        latest = latest_of(versions)
+        out += [f"## `{pid}` — latest {latest}", "",
+                SUMMARY.get(pid, ""), "",
+                f"- **Contexts** `{newest['contexts']}` · **flow** `{newest['flow']}` · "
+                f"**ceremony** `{newest['ceremony']}`",
+                f"- **Capabilities** `{newest['allow']}`",
+                "", "| version | sha256 | url |", "|---|---|---|"]
+        for v in versions:
+            out.append(f"| `{v['version']}`{' ← latest' if v['version'] == latest else ''} | "
+                       f"`{v['digest']}` | `{RAW}/{v['file']}` |")
+        out += ["",
+                f"Adopt an exact version with `{pid}@{latest}`, or `{pid}@latest` to take whatever "
+                "is newest at the time. The consent sentence is in each version's own final "
+                "section — versions differ, and so do their sentences.", ""]
+    out += ["---", "",
+            "Regenerate with `bin/fp-index`, which also writes `index.json` — the same data, "
+            "machine-readable, and the thing a signature covers. `make test` fails if either "
+            "drifts from the prompts.", ""]
+    return "\n".join(out)
+
+
+if __name__ == "__main__":
+    text, mtext = build(), manifest()
+    md, js = ROOT / "INDEX.md", ROOT / "index.json"
+    if "--check" in sys.argv:
+        stale = [p.name for p, want in ((md, text), (js, mtext))
+                 if (p.read_text() if p.exists() else "") != want]
+        if stale:
+            print(f"stale, run bin/fp-index: {', '.join(stale)}", file=sys.stderr)
+            sys.exit(1)
+        print("INDEX.md and index.json are current")
+        sys.exit(0)
+    md.write_text(text)
+    js.write_text(mtext)
+    print(f"wrote INDEX.md ({len(text.splitlines())} lines) and index.json ({len(rows())} prompts)")

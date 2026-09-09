@@ -1,0 +1,208 @@
+#!/usr/bin/env bash
+# fp-verify -- the managed path: verify the manifest, then a prompt against it.
+#
+#   fp-verify                          # is the local index.json signed by a known publisher?
+#   fp-verify <id> [--base DIR]        # ...and are these the bytes it vouched for?
+#   fp-verify <id> --from <dir-or-url> # fetch the publisher's manifest, then check
+#
+# --from is what makes late binding real. Without it this reads a manifest from
+# your own checkout, so a publisher updating a prompt reaches nobody until they
+# pull -- and signing a file you already had is close to pointless. With it, the
+# manifest and the document both come from the publisher and only the trust root
+# (allowed_signers) is local, which is the one thing that must never be fetched
+# from the host it is used to check.
+#
+# Exit: 0 verified · 1 not verified · 2 cannot check (missing signature, key, tool).
+#
+# Exit 2 is not exit 0. An agent in a managed context that cannot verify must
+# fail closed -- falling back to an unsigned fetch turns a policy boundary into
+# a suggestion at the moment it matters (FPA.md AC4).
+set -uo pipefail
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$here"
+
+from=""
+for i in "$@"; do
+  [ "${prev:-}" = "--from" ] && from="$i"
+  prev="$i"
+done
+
+# Once fpa.registered exists, this workspace has opted into the registered model,
+# and a catalog absent from it was never agreed to. A workspace with no such file
+# is simply not using the model, so nothing changes for it.
+registering=""
+for i in "$@"; do [ "$i" = "--registering" ] && registering=1; done
+
+if [ -n "$from" ] && [ -z "$registering" ] && [ -f "$here/fpa.registered" ]; then
+  base_key="${from%/}"
+  if ! grep -qs "^${base_key} " "$here/fpa.registered"; then
+    echo "fp-verify: $base_key is not in fpa.registered." >&2
+    echo "  This workspace registers the catalogs it accepts. Register it deliberately:" >&2
+    echo "    bin/fp-register $base_key" >&2
+    exit 1
+  fi
+fi
+
+work="$here"
+if [ -n "$from" ]; then
+  [ -f allowed_signers ] || { echo "fp-verify: no local allowed_signers -- the trust root must be
+  pinned locally, never taken from the host it checks. Failing closed." >&2; exit 2; }
+  work=$(mktemp -d 2>/dev/null || echo "/tmp/fp-from-$$") || exit 2
+  mkdir -p "$work" || exit 2
+  cp allowed_signers "$work/" || exit 2
+  for f in index.json index.json.sig; do
+    case "$from" in
+      gh:*)
+        # A private catalog needs no publication, only the credential the pilot
+        # already holds. The API's raw media type returns the blob itself.
+        spec="${from#gh:}"; repo="${spec%%@*}"; branch="${spec#*@}"
+        if ! gh api "repos/$repo/contents/$f" -H "Accept: application/vnd.github.raw" \
+             -X GET -f "ref=$branch" > "$work/$f" 2>/dev/null; then
+          echo "fp-verify: gh could not read $repo@$branch/$f -- cannot verify, failing closed" >&2
+          exit 2
+        fi
+        ;;
+      *)
+        if [ -f "$from/$f" ]; then
+          cp "$from/$f" "$work/$f" || { echo "fp-verify: cannot read $from/$f" >&2; exit 2; }
+        elif ! curl -fsS --max-time 20 "$from/$f" -o "$work/$f" 2>/dev/null; then
+          echo "fp-verify: cannot fetch $from/$f -- cannot verify, failing closed" >&2; exit 2
+        fi
+        ;;
+    esac
+  done
+  cd "$work" || exit 2
+fi
+
+for f in index.json index.json.sig allowed_signers; do
+  [ -f "$f" ] || { echo "fp-verify: missing $f -- cannot verify, failing closed" >&2; exit 2; }
+done
+command -v ssh-keygen >/dev/null || { echo "fp-verify: ssh-keygen not found" >&2; exit 2; }
+
+signer=$(awk '{print $1; exit}' allowed_signers)
+if ! ssh-keygen -Y verify -f allowed_signers -I "$signer" -n foreign-prompts \
+     -s index.json.sig < index.json >/dev/null 2>&1; then
+  echo "fp-verify: index.json is NOT signed by $signer" >&2
+  echo "  Either the manifest was modified after signing, or it was signed by someone else." >&2
+  exit 1
+fi
+echo "manifest verified: index.json signed by $signer"
+
+[ $# -gt 0 ] && [ "${1#-}" = "$1" ] || exit 0
+id="$1"; shift
+base=""
+if [ "${1:-}" = "--base" ]; then
+  # ${2:-} not $2: with set -u a missing value crashed the script and exited 1,
+  # which on the managed path reads as "not verified" rather than "cannot check".
+  base="${2:-}"
+  if [ -z "$base" ]; then
+    echo "fp-verify: --base given without a directory -- cannot check, failing closed" >&2
+    exit 2
+  fi
+fi
+
+python3 - "$id" "$base" "$here" "$from" <<'PY'
+import hashlib, json, pathlib, sys, urllib.request
+wanted, base, root, origin = sys.argv[1], sys.argv[2], pathlib.Path(sys.argv[3]), sys.argv[4]
+manifest = json.load(open("index.json"))
+# Expiry first, because it is the half that needs no memory. A serial floor only
+# protects a client that has already seen something newer; a fresh agent, a wiped
+# .fpa or a clean container has no floor at all, and would accept an arbitrarily
+# old signed bundle. `not_after` kills a replay on its own.
+import datetime
+now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+not_after = manifest.get("not_after")
+if not not_after:
+    print("fp-verify: manifest carries no not_after -- cannot tell a current manifest from a "
+          "replayed one. Refusing.", file=sys.stderr)
+    sys.exit(1)
+if now > not_after:
+    print(f"fp-verify: manifest expired at {not_after} (now {now}).\n"
+          "  A signature stays valid forever; the manifest is not meant to. The publisher "
+          "re-signs, they do not ask you to trust an old one.", file=sys.stderr)
+    sys.exit(1)
+
+# Freshness: a signed manifest older than the last one seen is a replay, and every
+# signature on it verifies. The floor is what makes that detectable.
+#
+# Kept PER CATALOG, keyed by the manifest's own `base`. One global floor meant
+# that adopting from a second publisher refused whichever catalog had the lower
+# serial -- a brand new catalog starting at 1 read as a rollback of an unrelated
+# one at 45. `base` is inside the signed bytes, so it cannot be forged to reset
+# a floor without breaking the signature.
+seen = root / ".fpa" / "manifest-serials.json"
+catalog = manifest.get("base", "")
+serial = int(manifest.get("serial", 0))
+floors = {}
+if seen.exists():
+    try:
+        floors = json.loads(seen.read_text())
+    except json.JSONDecodeError:
+        floors = {}
+if catalog in floors:
+    floor = int(floors[catalog])
+    if serial < floor:
+        print(f"fp-verify: manifest serial {serial} from {catalog} is older than {floor}, "
+              "already seen from that catalog.\n"
+              "  A validly signed but stale manifest is a rollback. Refusing.", file=sys.stderr)
+        sys.exit(1)
+floors[catalog] = serial
+seen.parent.mkdir(parents=True, exist_ok=True)
+seen.write_text(json.dumps(floors, indent=2, sort_keys=True) + "\n")
+wanted, _, selector = wanted.partition("@")
+group = next((p for p in manifest["prompts"] if p["id"] == wanted), None)
+if group is None:
+    print(f"fp-verify: {wanted!r} is not in the signed manifest -- refusing", file=sys.stderr)
+    sys.exit(1)
+asked = selector or "latest"
+target = group["latest"] if asked == "latest" else asked
+entry = next((v for v in group["versions"] if v["version"] == target), None)
+if entry is None:
+    have = ", ".join(v["version"] for v in group["versions"])
+    print(f"fp-verify: {wanted} has no version {target!r} in the signed manifest. "
+          f"Published: {have}", file=sys.stderr)
+    sys.exit(1)
+entry = dict(entry, id=wanted)
+# A fetched manifest names where its own documents live; prefer that over the
+# base baked into whatever copy happened to be on disk.
+if base:
+    src = f"{base.rstrip('/')}/{entry['file']}"
+elif origin:
+    src = f"{origin.rstrip('/')}/prompts/{entry['file']}"
+else:
+    src = f"{manifest['base']}/{entry['file']}"
+try:
+    if src.startswith("gh:"):
+        import subprocess
+        spec = src[3:]
+        repo, _, rest = spec.partition("@")
+        branch, _, path = rest.partition("/")
+        proc = subprocess.run(["gh", "api", f"repos/{repo}/contents/{path}",
+                               "-H", "Accept: application/vnd.github.raw", "-X", "GET",
+                               "-f", f"ref={branch}"], capture_output=True, timeout=30)
+        if proc.returncode != 0:
+            raise OSError(proc.stderr.decode("utf-8", "replace")[:200])
+        raw = proc.stdout
+    else:
+        raw = (pathlib.Path(src).read_bytes() if not src.startswith("http")
+               else urllib.request.urlopen(src, timeout=15).read())
+except Exception as exc:
+    print(f"fp-verify: cannot read {src} -- {exc}", file=sys.stderr)
+    sys.exit(2)
+got = hashlib.sha256(raw).hexdigest()
+if got != entry["digest"]:
+    print(f"fp-verify: DIGEST MISMATCH for {wanted}\n  manifest {entry['digest']}\n"
+          f"  fetched  {got}\n  source   {src}\nRefusing.", file=sys.stderr)
+    sys.exit(1)
+if "managed" not in [c.strip() for c in entry["contexts"].split(",")]:
+    print(f"fp-verify: {wanted} declares contexts [{entry['contexts']}] -- it is not fit for the "
+          "managed context, so a signature does not authorize it (FPA.md AC1).", file=sys.stderr)
+    sys.exit(1)
+soon = (datetime.datetime.strptime(not_after, "%Y-%m-%dT%H:%M:%SZ")
+        .replace(tzinfo=datetime.timezone.utc) - datetime.datetime.now(datetime.timezone.utc)).days
+if soon <= 3:
+    print(f"fp-verify: note -- this manifest expires in {soon} day(s), on {not_after}",
+          file=sys.stderr)
+print(f"authorized: {wanted} v{entry['version']} digest {got[:12]} "
+      f"contexts [{entry['contexts']}] serial {serial} expires {not_after} source {src}")
+PY

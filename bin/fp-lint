@@ -1,0 +1,488 @@
+#!/usr/bin/env python3
+"""fp-lint — validate the structure of a foreign prompt (.prompt.md).
+
+Checks what can be checked deterministically against FPA.md v1: the marker, the
+front matter, the capability tokens, and the section frame. Takes a path, a URL,
+or '-' for stdin.
+
+    fp-lint prompts/repo-recon.prompt.md
+    fp-lint https://raw.githubusercontent.com/org/repo/main/thing.prompt.md
+    cat thing.prompt.md | fp-lint -
+
+Flags: -q errors only · -v show notes · --json · --strict (warnings fail).
+
+Exit: 0 valid · 1 findings · 2 bad usage or unreadable input · 3 internal error.
+Those are distinct on purpose: a linter that crashes must never be mistaken for
+a linter that rejected something.
+
+WHAT THIS TOOL DOES NOT DO: judge intent. It scans for no hostile patterns,
+because no pattern list survives paraphrase, and a "clean" verdict from one is
+worse than no verdict at all. A valid document is a well-formed document and
+nothing more. Read it before you adopt it.
+"""
+
+import json
+import re
+import sys
+
+MARKER = "<!-- FOREIGN-PROMPT v2 -->"
+MAX_BYTES = 256 * 1024
+
+REQUIRED_KEYS = ["id", "version", "ceremony", "flow", "expiry", "envelope", "allow", "deny"]
+OPTIONAL_KEYS = ["adoption", "persistence", "contexts", "requires", "author"]
+
+# The consent sentence lives ONLY in the final "## Consent" section, never in front
+# matter. It was in both, and the spec claimed a phrase "you can only reach by
+# traversing the document" while every prompt published it on line 5.
+
+# FPA.md AC1. Unattended use is opt-in: a prompt that acts has no business
+# defaulting into a context where nobody is watching it start.
+CONTEXTS = {"interactive", "registered", "managed"}
+
+FRAME_HEAD = ["## Preamble", "## Envelope"]
+FRAME_TAIL = ["## Handshake", "## Expiry"]
+
+FLOWS = {
+    "linear": ["## Steps", "## Stop conditions"],
+    "loop": ["## Turn", "## Inputs", "## Exit"],
+    "state-machine": ["## States", "## Transitions", "## Endings"],
+    "rubric": ["## Criteria", "## Output", "## Never"],
+    "interpreter": ["## Render", "## State", "## Keys", "## Director rules"],
+    "interview": ["## Questions", "## Branching", "## Output"],
+}
+
+# FPA.md 4. Free-form English is not permitted: a capability nothing can compare
+# against can never be enforced, only admired.
+CAPABILITIES = {
+    "read:files", "read:git", "read:logs", "read:conversation",
+    "run:shell-ro", "run:tests", "run:build",
+    "write:files", "write:artifact",
+    "vcs:commit", "vcs:push",
+    "net:get", "net:post",
+    "pkg:install", "secrets:read",
+}
+SHOULD_DENY = ["secrets:read", "net:post"]
+
+# Capabilities whose consequences outrun a consent sentence on its own (FPA.md CE1).
+ACTS = {"write:files", "write:artifact", "vcs:commit", "vcs:push",
+        "net:get", "net:post", "pkg:install"}
+
+AXES = {
+    "ceremony": {"light", "standard", "strict"},
+    "adoption": {"awaiting", "immediate", "one-shot"},
+    "persistence": {"none", "artifact"},
+    "envelope": {"strict", "open"},
+}
+
+# Exactly the list FPA.md C2 enumerates -- no more. An implementation that invents
+# extra forbidden words is a second, undocumented spec.
+GENERIC_PHRASES = {
+    "run", "do", "go", "use", "load", "read", "open", "get", "fetch", "start",
+    "exec", "apply", "install", "adopt", "prompt", "url",
+}
+
+# Official semver, so 1.0.0-rc.1 is valid and 01.0.0 is not. The previous
+# \d+\.\d+\.\d+ was wrong in both directions.
+SEMVER = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"
+    r"(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
+    r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
+    r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+)
+FENCE_OPEN = re.compile(r"^(```|~~~)")
+ANCHOR = re.compile(r"(?:^|\s)[&*][A-Za-z0-9_-]+")
+
+
+class Unreadable(Exception):
+    """Input could not be read — exit 2, distinct from a document being invalid."""
+
+
+def read_source(src):
+    if src == "-":
+        return sys.stdin.read()
+    if src.startswith("gh:"):
+        return fetch_gh(src)
+    if src.startswith(("http://", "https://")):
+        return fetch(src)
+    try:
+        with open(src, encoding="utf-8") as fh:
+            return fh.read()
+    except UnicodeDecodeError as exc:
+        raise Unreadable(f"not valid UTF-8 ({exc})") from exc
+    except OSError as exc:
+        raise Unreadable(str(exc)) from exc
+
+
+def fetch_gh(ref):
+    """gh:owner/repo@ref/path — fetch through the GitHub API with the caller's own
+    credential, so a private catalog needs no publication.
+
+    Byte-identical to the raw file: the API's raw media type returns the blob, not
+    a rendering of it. `gh` is doing nothing here that a token and curl could not;
+    it is simply the credential the pilot already has.
+    """
+    import subprocess
+    spec = ref[len("gh:"):]
+    repo, _, rest = spec.partition("@")
+    branch, _, path = rest.partition("/")
+    if not path:
+        raise Unreadable(f"gh reference needs a path: gh:owner/repo@branch/path -- got {ref!r}")
+    proc = subprocess.run(
+        ["gh", "api", f"repos/{repo}/contents/{path}", "-H", "Accept: application/vnd.github.raw",
+         "-X", "GET", "-f", f"ref={branch}"],
+        capture_output=True, timeout=30)
+    if proc.returncode != 0:
+        raise Unreadable(f"gh could not read {repo}@{branch}/{path}: "
+                         f"{proc.stderr.decode('utf-8', 'replace').strip()[:200]}")
+    raw = proc.stdout
+    if len(raw) > MAX_BYTES:
+        raise Unreadable(f"document exceeds {MAX_BYTES} bytes")
+    return raw.decode("utf-8")
+
+
+def fetch(url):
+    """Fetch a document with the limits a linter pointed at hostile URLs needs.
+
+    HTTPS only, no redirects, no credentials, no private addresses, bounded size
+    and time. The DNS answer is checked after resolution, so a public name that
+    resolves inward does not get a pass.
+    """
+    import ipaddress
+    import socket
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlsplit
+
+    parts = urlsplit(url)
+    if parts.scheme != "https":
+        raise Unreadable("refusing to fetch over anything but https")
+    if parts.username or parts.password:
+        raise Unreadable("refusing to fetch a URL carrying credentials")
+    host = parts.hostname or ""
+    try:
+        infos = socket.getaddrinfo(host, parts.port or 443, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise Unreadable(f"cannot resolve {host}: {exc}") from exc
+    for info in infos:
+        addr = ipaddress.ip_address(info[4][0])
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            raise Unreadable(f"{host} resolves to a non-public address ({addr})")
+
+    class NoRedirects(urllib.request.HTTPRedirectHandler):
+        def redirect_request(self, *_args, **_kwargs):
+            return None
+
+    opener = urllib.request.build_opener(NoRedirects)
+    req = urllib.request.Request(url, headers={"User-Agent": "fp-lint/1.0"})
+    try:
+        with opener.open(req, timeout=15) as resp:
+            ctype = resp.headers.get_content_type()
+            if ctype not in ("text/plain", "text/markdown", "application/octet-stream"):
+                raise Unreadable(f"unexpected content-type {ctype!r}; want raw text")
+            raw = resp.read(MAX_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        raise Unreadable(f"HTTP {exc.code}" + (" (redirects are not followed)" if exc.code in (301, 302, 303, 307, 308) else "")) from exc
+    except urllib.error.URLError as exc:
+        raise Unreadable(str(exc.reason)) from exc
+    if len(raw) > MAX_BYTES:
+        raise Unreadable(f"document exceeds {MAX_BYTES} bytes")
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise Unreadable(f"not valid UTF-8 ({exc})") from exc
+
+
+def parse_front_matter(lines):
+    """Flat key: value pairs. Returns (dict, [errors])."""
+    if len(lines) < 2 or lines[1].strip() != "---":
+        return {}, ["front matter must open with '---' on line 2"]
+    fm, errors, end = {}, [], None
+    for i in range(2, len(lines)):
+        if lines[i].strip() == "---":
+            end = i
+            break
+        raw = lines[i].strip()
+        if not raw or raw.startswith("#"):
+            continue
+        if ":" not in raw:
+            errors.append(f"line {i + 1}: not a 'key: value' pair -- {raw[:60]!r}")
+            continue
+        key, val = raw.split(":", 1)
+        key = key.strip()
+        if key in fm:
+            errors.append(f"line {i + 1}: duplicate key {key!r}")
+        if ANCHOR.search(val):
+            errors.append(f"line {i + 1}: YAML anchors and aliases are not part of the flat "
+                          f"key: value subset (FPA.md 2.2) -- {val.strip()[:40]!r}")
+        fm[key] = val.strip().strip('"').strip("'")
+    if end is None:
+        errors.append("front matter is never closed with '---'")
+    return fm, errors
+
+
+def consent_sentence(text, pid):
+    """The sentence, read out of the '## Consent' section's first fenced line.
+
+    Everything after it in the phrase -- the id, the digest -- is composed by the
+    pilot, so it is stripped here: what the document declares is the sentence.
+    """
+    tail = re.split(r"^## Consent\s*$", text, maxsplit=1, flags=re.M)
+    if len(tail) < 2:
+        return ""
+    fence = re.search(r"^```\s*$\n([^\n]+)\n```", tail[1], re.M)
+    if not fence:
+        return ""
+    line = fence.group(1).strip()
+    if pid:
+        line = re.sub(rf"-{re.escape(pid)}-.*$", "", line)
+    return line
+
+
+def tokens(value):
+    return [t.strip() for t in value.split(",") if t.strip()]
+
+
+def lint(text, name):
+    errors, warnings, notes = [], [], []
+    err, warn, note = errors.append, warnings.append, notes.append
+
+    if len(text.encode("utf-8")) > MAX_BYTES:
+        err(f"document exceeds {MAX_BYTES} bytes")
+    lines = text.splitlines()
+    if not lines:
+        return ["empty document"], [], [], {}
+
+    # Exact, not stripped: " <!-- FOREIGN-PROMPT v1 -->" used to pass a check
+    # whose own error message says "must be exactly".
+    if lines[0].rstrip("\r") != MARKER:
+        first = lines[0].strip()
+        if first == MARKER:
+            err("line 1: marker must start at column 1 with no surrounding whitespace")
+        elif first.startswith("<!-- FOREIGN-PROMPT"):
+            err(f"line 1: unsupported protocol version -- {first!r} (this linter speaks v2)")
+        else:
+            err(f"line 1: missing marker; must be exactly {MARKER!r}")
+
+    fm, fm_errors = parse_front_matter(lines)
+    for e in fm_errors:
+        err(e)
+
+    for key in REQUIRED_KEYS:
+        if key not in fm:
+            err(f"front matter: missing required key '{key}'")
+    for key in fm:
+        if key not in REQUIRED_KEYS + OPTIONAL_KEYS:
+            warn(f"front matter: unknown key '{key}' (ignored by v1 readers, FPA.md 2.2)")
+    if "handshake" in fm:
+        warn("front matter: 'handshake' is not author-defined; it is computed as "
+             "'ADOPTED: <id> v<version>' (FPA.md 11)")
+
+    if "id" in fm and not re.fullmatch(r"[a-z0-9-]+", fm["id"]):
+        err(f"front matter: id {fm['id']!r} must match [a-z0-9-]+")
+    if "version" in fm and not SEMVER.match(fm["version"]):
+        err(f"front matter: version {fm['version']!r} is not valid semver "
+            "(MAJOR.MINOR.PATCH, no leading zeros, optional -prerelease and +build)")
+    if "expiry" in fm and not re.fullmatch(r"session|task|turns:\s*\d+|until:.+", fm["expiry"]):
+        err(f"front matter: expiry must be session|task|turns:<N>|until:<condition>, got {fm['expiry']!r}")
+    for axis, allowed in AXES.items():
+        if axis in fm and fm[axis] not in allowed:
+            err(f"front matter: {axis} must be one of {sorted(allowed)}, got {fm[axis]!r}")
+
+    if "consent" in fm:
+        err("front matter: 'consent' does not belong here -- the sentence lives only in the "
+            "final '## Consent' section, or reaching the end of the document proves nothing "
+            "(FPA.md C2)")
+
+    phrase = consent_sentence(text, fm.get("id", ""))
+    if not phrase:
+        err("body: no consent sentence found in a '## Consent' section (FPA.md C1)")
+    if phrase:
+        if not re.fullmatch(r"[a-z][a-z0-9-]{15,119}", phrase):
+            err(f"front matter: consent {phrase!r} must match [a-z][a-z0-9-]{{15,119}} (FPA.md C1) -- "
+                "a sentence, not a word")
+        elif phrase.split("-")[0] in GENERIC_PHRASES:
+            err(f"front matter: consent {phrase!r} opens with a generic command verb; it should read "
+                "as a first-person statement of what the pilot is agreeing to (FPA.md C3)")
+        elif not phrase.startswith(("i-", "we-")):
+            warn("front matter: consent does not begin 'i-' or 'we-'; a phrase the pilot types should "
+                 "state in the first person what they are agreeing to (FPA.md C3)")
+        if len(set(phrase.split("-"))) < 5:
+            warn("front matter: consent is barely a sentence; ceremony works by being awkward to "
+                 "paste without reading (FPA.md C3)")
+
+    ceremony = fm.get("ceremony", "")
+    acting = set(tokens(fm.get("allow", ""))) & ACTS
+    if ceremony == "light" and acting:
+        err(f"front matter: ceremony 'light' with {sorted(acting)} in allow -- a prompt that acts "
+            "must demand a digest (FPA.md CE1)")
+
+    for key in ("allow", "deny"):
+        if key not in fm:
+            continue
+        listed = tokens(fm[key])
+        if not listed:
+            err(f"front matter: '{key}' must name at least one capability token, or 'none' "
+                "for a prompt that needs no capability at all (FPA.md 4)")
+        if listed == ["none"]:
+            continue
+        if "none" in listed:
+            err(f"front matter: '{key}' lists 'none' alongside other tokens; 'none' stands alone")
+        for t in listed:
+            if t not in CAPABILITIES:
+                err(f"front matter: {key} token {t!r} is not in the v1 capability vocabulary "
+                    f"(FPA.md 4); valid tokens: {', '.join(sorted(CAPABILITIES))}")
+    overlap = (set(tokens(fm.get("allow", ""))) & set(tokens(fm.get("deny", "")))) - {"none"}
+    if overlap:
+        err(f"front matter: {sorted(overlap)} appear in both allow and deny; deny wins, "
+            "so remove them from allow (FPA.md E1)")
+    denied = set(tokens(fm.get("deny", "")))
+    allowed = set(tokens(fm.get("allow", "")))
+    for t in SHOULD_DENY:
+        if t not in denied and t not in allowed:
+            warn(f"front matter: deny does not list {t!r}; most prompts should deny it explicitly")
+
+    listed_contexts = tokens(fm.get("contexts", "interactive"))
+    for c in listed_contexts:
+        if c not in CONTEXTS:
+            err(f"front matter: context {c!r} must be one of {sorted(CONTEXTS)} (FPA.md AC1)")
+    if acting and listed_contexts != ["interactive"] and "requires" not in fm:
+        warn(f"front matter: {sorted(acting)} in allow with contexts {listed_contexts} -- a prompt "
+             "that acts unattended should declare what the host must provide (FPA.md AC1)")
+
+    persistence = fm.get("persistence", "none")
+    if persistence == "none" and "write:artifact" in allowed:
+        err("front matter: allows write:artifact while persistence is 'none' (FPA.md P1)")
+    if persistence == "artifact" and "write:artifact" not in allowed:
+        warn("front matter: persistence is 'artifact' but allow does not list write:artifact")
+
+    # Sections. Fenced blocks are stripped first: a heading inside a code fence is
+    # an example, not structure, and treating it as structure was a real bypass.
+    # Blank out HTML comments before anything reads structure. A heading inside a
+    # comment is invisible to every reader except a line-oriented regex, so a
+    # document could hide its entire body in one and still validate.
+    body = re.sub(r"<!--.*?-->", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+    if body.count("<!--") > body.count("-->"):
+        err("body: an HTML comment is opened and never closed")
+    prose, fenced, opener = [], False, None
+    for line in body.splitlines():
+        if FENCE_OPEN.match(line):
+            if not fenced:
+                fenced, opener = True, FENCE_OPEN.match(line).group(1)
+            elif line.startswith(opener):
+                fenced = False
+            prose.append("")
+            continue
+        prose.append("" if fenced else line)
+    if fenced:
+        err("body: a code fence is opened and never closed, so the rest of the document "
+            "is unreadable as structure")
+    prose = "\n".join(prose)
+    seen = [(m.group(1).strip(), m.start()) for m in re.finditer(r"^(## .+?)\s*$", prose, re.M)]
+    positions = dict(seen)
+    for h in FRAME_HEAD + FRAME_TAIL:
+        if h not in positions:
+            err(f"body: missing section '{h}' (outside code fences)")
+    frame = [positions[h] for h in FRAME_HEAD + FRAME_TAIL if h in positions]
+    if len(frame) == 4:
+        if frame != sorted(frame):
+            err("body: frame sections out of order; want Preamble, Envelope, …, Handshake, Expiry")
+        elif not [p for _, p in seen if frame[1] < p < frame[2]]:
+            err("body: no section of its own between '## Envelope' and '## Handshake' -- "
+                "a prompt with no body is not a prompt")
+    dupes = {h for h, _ in seen if [x for x, _ in seen].count(h) > 1}
+    for h in sorted(dupes):
+        err(f"body: section {h!r} appears more than once")
+
+    flow = fm.get("flow", "")
+    if flow and flow not in FLOWS:
+        err(f"front matter: flow {flow!r} must be one of {sorted(FLOWS)} (FPA.md 3)")
+    elif flow:
+        missing = [h for h in FLOWS[flow] if h not in positions]
+        if missing:
+            note(f"body: flow '{flow}' conventionally uses {', '.join(missing)} -- "
+                 "advisory only (FPA.md 3)")
+
+    heads = [h for h, _ in seen]
+    if "## Consent" not in heads:
+        err("body: no '## Consent' section -- a prompt MUST close with the sentence its pilot "
+            "types, because reaching it is what the sentence proves (FPA.md 2.3)")
+    elif heads[-1] != "## Consent":
+        err(f"body: '## Consent' is not the last section ({heads[-1]!r} follows it); a phrase "
+            "reachable without traversing the document proves nothing (FPA.md 2.3)")
+    # Front matter declares the sentence; that is not the body advertising it early.
+    body_only = text.split("\n---\n", 2)[-1]
+    if phrase and phrase in body_only.split("## Consent", 1)[0]:
+        err("body: the consent sentence appears before the '## Consent' section, so a reader can "
+            "take it without reaching the end -- which is the only thing it proves")
+
+    if "TART" not in text:
+        warn("body: never addresses TART; a foreign prompt should speak to the runtime agent directly")
+    if phrase and not re.search(rf"\b{re.escape(phrase)}\b", text, re.I):
+        warn("body: never mentions its own confirmation phrase, so a reader cannot tell what "
+             "the pilot had to type")
+    hs = f"ADOPTED: {fm.get('id', '')} v{fm.get('version', '')}"
+    if "id" in fm and "version" in fm and hs not in text:
+        warn(f"body: the '## Handshake' section should show the computed line {hs!r}")
+
+    if name not in ("-", "<stdin>") and not name.endswith(".prompt.md"):
+        warn(f"{name}: conventional extension is '.prompt.md'")
+
+    return errors, warnings, notes, fm
+
+
+def main(argv):
+    flags = {a for a in argv[1:] if a.startswith("-") and a != "-"}
+    args = [a for a in argv[1:] if not a.startswith("-")] + (["-"] if "-" in argv[1:] else [])
+    unknown = flags - {"-q", "--quiet", "-v", "--verbose", "--json", "--strict", "-h", "--help"}
+    if unknown:
+        print(f"fp-lint: unknown flag {sorted(unknown)[0]!r}", file=sys.stderr)
+        return 2
+    if not args or "-h" in flags or "--help" in flags:
+        print(__doc__)
+        return 0 if args else 2
+
+    as_json, quiet = "--json" in flags, ("-q" in flags or "--quiet" in flags)
+    strict, verbose = "--strict" in flags, ("-v" in flags or "--verbose" in flags)
+    report, failed = {}, False
+
+    for src in args:
+        try:
+            text = read_source(src)
+        except Unreadable as exc:
+            print(f"{src}: cannot read -- {exc}", file=sys.stderr)
+            return 2
+
+        errors, warnings, notes, fm = lint(text, src)
+        report[src] = {"errors": errors, "warnings": warnings, "notes": notes,
+                       "ok": not errors, "front_matter": fm}
+        if errors or (strict and warnings):
+            failed = True
+        if as_json:
+            continue
+        for e in errors:
+            print(f"{src}: ERROR: {e}")
+        if not quiet:
+            for w in warnings:
+                print(f"{src}: WARN:  {w}")
+            if verbose:
+                for n in notes:
+                    print(f"{src}: note:  {n}")
+            if not errors:
+                tail = f" ({len(warnings)} warning{'s' if len(warnings) != 1 else ''})" if warnings else ""
+                # The confirmation phrase is deliberately not printed (FPA.md PV1).
+                print(f"{src}: VALID{tail} -- well-formed {fm.get('flow', '?')} prompt "
+                      f"'{fm.get('id', '?')}' v{fm.get('version', '?')}, ceremony "
+                      f"{fm.get('ceremony', '?')}. Structure only: this says nothing about intent. "
+                      "Read it.")
+
+    if as_json:
+        print(json.dumps(report, indent=2))
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main(sys.argv))
+    except Exception as exc:  # noqa: BLE001 — a crash must not look like a rejection
+        print(f"fp-lint: internal error: {type(exc).__name__}: {exc}", file=sys.stderr)
+        sys.exit(3)
