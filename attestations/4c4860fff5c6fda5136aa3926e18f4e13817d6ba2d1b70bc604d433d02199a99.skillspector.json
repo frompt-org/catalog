@@ -1,0 +1,31 @@
+{
+ "attestation": 1,
+ "authority": "skillspector",
+ "authority_version": "SkillSpector v2.11.2",
+ "coverage_percent": 100.0,
+ "digest": "4c4860fff5c6fda5136aa3926e18f4e13817d6ba2d1b70bc604d433d02199a99",
+ "id": "ticket-intake",
+ "issues": [
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 73,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Supply Chain",
+   "confidence": 0.9,
+   "id": "SC2",
+   "line": 86,
+   "rule": null,
+   "severity": "HIGH"
+  }
+ ],
+ "kind": "static-scan",
+ "observed_at": "2026-09-09T22:20:48Z",
+ "score": 29,
+ "severity": "MEDIUM",
+ "version": "1.0.0"
+}

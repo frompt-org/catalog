@@ -1,0 +1,47 @@
+{
+ "attestation": 1,
+ "authority": "skillspector",
+ "authority_version": "SkillSpector v2.11.2",
+ "coverage_percent": 100.0,
+ "digest": "e495a52bcaa6c67b4eed0f227511237b53101143e43c8882d17d029c2917e643",
+ "id": "fpa-bootstrap",
+ "issues": [
+  {
+   "category": "Excessive Agency",
+   "confidence": 0.75,
+   "id": "EA2",
+   "line": 42,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 60,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 77,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Supply Chain",
+   "confidence": 0.9,
+   "id": "SC2",
+   "line": 90,
+   "rule": null,
+   "severity": "HIGH"
+  }
+ ],
+ "kind": "static-scan",
+ "observed_at": "2026-09-09T22:20:12Z",
+ "score": 39,
+ "severity": "MEDIUM",
+ "version": "2.0.0"
+}

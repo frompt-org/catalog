@@ -1,0 +1,23 @@
+{
+ "attestation": 1,
+ "authority": "skillspector",
+ "authority_version": "SkillSpector v2.11.2",
+ "coverage_percent": 100.0,
+ "digest": "b58f913e3011a6c7f0b8ade10f15b69fcbddc1ca0c4dd9ce2ce80baf2d7e7a7b",
+ "id": "pr-review",
+ "issues": [
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 60,
+   "rule": null,
+   "severity": "MEDIUM"
+  }
+ ],
+ "kind": "static-scan",
+ "observed_at": "2026-09-09T22:20:36Z",
+ "score": 6,
+ "severity": "LOW",
+ "version": "1.3.0"
+}
