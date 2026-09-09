@@ -7,9 +7,9 @@ name: assay
 on:
   push:
     branches: [main]
-    paths: ['prompts/**/*.prompt.md']
+    paths: ['prompts/**/*.frompt.md']
   pull_request:
-    paths: ['prompts/**/*.prompt.md']
+    paths: ['prompts/**/*.frompt.md']
 permissions:
   contents: write
 jobs:
@@ -25,7 +25,7 @@ jobs:
         id: changed
         run: |
           base="${{ github.event.pull_request.base.sha || github.event.before }}"
-          git diff --name-only "$base" HEAD -- 'prompts/**/*.prompt.md' | tr '\n' ' ' > changed.txt
+          git diff --name-only "$base" HEAD -- 'prompts/**/*.frompt.md' | tr '\n' ' ' > changed.txt
           echo "docs=$(cat changed.txt)" >> "$GITHUB_OUTPUT"
       - name: attest
         run: |
@@ -40,5 +40,5 @@ jobs:
       - name: commit attestations
         if: github.event_name == 'push'
         run: |
-          git config user.name assay && git config user.email assay@f-prompts
+          git config user.name assay && git config user.email assay@frompt
           git add attestations && git diff --cached --quiet || git commit -m "assay: attestations for ${{ steps.changed.outputs.docs }}" && git push
