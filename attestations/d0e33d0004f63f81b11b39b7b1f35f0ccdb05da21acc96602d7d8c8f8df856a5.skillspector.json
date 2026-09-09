@@ -1,7 +1,7 @@
 {
  "attestation": 1,
  "authority": "skillspector",
- "authority_version": "SkillSpector v2.11.1",
+ "authority_version": "SkillSpector v2.11.2",
  "coverage_percent": 100.0,
  "digest": "d0e33d0004f63f81b11b39b7b1f35f0ccdb05da21acc96602d7d8c8f8df856a5",
  "id": "fpa-bootstrap",
@@ -48,7 +48,7 @@
   }
  ],
  "kind": "static-scan",
- "observed_at": "2026-09-09T22:39:31Z",
+ "observed_at": "2026-09-09T22:39:58Z",
  "score": 57,
  "severity": "HIGH",
  "version": "2.1.0"

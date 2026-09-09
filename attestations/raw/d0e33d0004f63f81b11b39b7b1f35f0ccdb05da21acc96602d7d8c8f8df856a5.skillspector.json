@@ -1,8 +1,8 @@
 {
   "skill": {
     "name": "unknown",
-    "source": "/var/folders/g8/_sx5jmm57qg2s0ndnh86x0nc0000gn/T/skillspector_kg9rrc6w",
-    "scanned_at": "2026-09-09T22:39:31.768574+00:00"
+    "source": "/tmp/skillspector_kpbu78_f",
+    "scanned_at": "2026-09-09T22:39:57.523661+00:00"
   },
   "risk_assessment": {
     "score": 57,
@@ -26,7 +26,7 @@
   "issues": [
     {
       "id": "P2",
-      "finding_id": "finding-163bc45e33584e78a972b6ff06c7486e",
+      "finding_id": "finding-ac11d65f4d3345c1b6b443fd92682057",
       "category": "Prompt Injection",
       "pattern": "Hidden Instructions",
       "severity": "HIGH",
@@ -56,7 +56,7 @@
     },
     {
       "id": "SC2",
-      "finding_id": "finding-31e53240e8ab4723a679b1f43e33e842",
+      "finding_id": "finding-da4f82d300de4efb88beb91ea13c31e1",
       "category": "Supply Chain",
       "pattern": "External Script Fetching",
       "severity": "HIGH",
@@ -86,7 +86,7 @@
     },
     {
       "id": "EA2",
-      "finding_id": "finding-84dec9ed578049fab35ba50d16fce192",
+      "finding_id": "finding-719cb2eace7d49dc9aee7143a2ec26dc",
       "category": "Excessive Agency",
       "pattern": "Autonomous Decision Making",
       "severity": "MEDIUM",
@@ -116,7 +116,7 @@
     },
     {
       "id": "RA2",
-      "finding_id": "finding-66c0b24a222a4c7d888f98f6542532f3",
+      "finding_id": "finding-b416ca975e804f1f9222e2542a3b34c3",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
@@ -146,7 +146,7 @@
     },
     {
       "id": "RA2",
-      "finding_id": "finding-66c0b24a222a4c7d888f98f6542532f3",
+      "finding_id": "finding-b416ca975e804f1f9222e2542a3b34c3",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
@@ -179,7 +179,7 @@
   "suppressed": [],
   "metadata": {
     "has_executable_scripts": false,
-    "skillspector_version": "2.11.1",
+    "skillspector_version": "2.11.2",
     "llm_requested": false,
     "llm_available": false,
     "meta_analysis_applied": false,
