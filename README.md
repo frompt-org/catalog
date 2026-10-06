@@ -1,14 +1,14 @@
-# stable — the catalog you register
+# catalog — the frompts you register
 
 **A foreign prompt — a frompt — is a prompt acquired from a non-local source, usually a URL, adopted on purpose by an agent that did not write it.** This is the catalog of them that people **register**: you trust this publisher's key once, and from then on your client resolves an id to verified bytes with nobody typing a digest. The digest does not go away; it moves from the phrase into the signed manifest, and the client checks every fetched document against it. That is how apt has worked for twenty years.
 
-The other catalog in this org, [`reference`](https://github.com/frompt-org/reference), is the exemplar: small, what the documentation and the conformance suite point at. This one is what you use.
+The frompts the documentation adopts as examples are published by [`protocol`](https://github.com/frompt-org/protocol) as a small signed catalog of their own. This is the one you use.
 
 ```
 index.json                        the signed manifest; a client fetches this first
 index.json.sig
 INDEX.md                          the same thing, for people -- digests, never consent sentences
-allowed_signers                   the key, identity frompt-stable -- read it here once, pin it elsewhere
+allowed_signers                   the key, identity frompt-catalog -- read it here once, pin it elsewhere
 prompts/<id>/<version>.frompt.md  the documents, immutable
 attestations/<digest>.*.json      what an assay observed about that exact document (see below)
 ```
@@ -20,9 +20,9 @@ Once, in a workspace:
 ```bash
 # 1. bring the key in yourself -- copy allowed_signers from this page, a colleague, your MDM;
 #    never let a tool fetch it from the catalog it will be used to check
-fp-register gh:frompt-org/stable@main --pin latest --trust ./frompt-stable.allowed_signers
+fp-register gh:frompt-org/catalog@main --pin latest --trust ./frompt-catalog.allowed_signers
 # once public:
-fp-register https://raw.githubusercontent.com/frompt-org/stable/main --pin latest --trust ./frompt-stable.allowed_signers
+fp-register https://raw.githubusercontent.com/frompt-org/catalog/main --pin latest --trust ./frompt-catalog.allowed_signers
 ```
 
 The key's fingerprint is `SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY`. The registration line records it, and a manifest later signed by any other key -- even one you also trust for another catalog -- is refused until you re-register on purpose.
@@ -30,9 +30,9 @@ The key's fingerprint is `SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY`. T
 That writes one line to `fpa.registered` -- catalog, key fingerprint, pin mode, when, who -- and that line is the consent. From then on:
 
 ```bash
-fp-resolve pr-review@latest --from gh:frompt-org/stable@main   # this catalog's manifest, bytes verified against it
-fp-resolve pr-review@2.0.0  --from gh:frompt-org/stable@main   # exactly that one
-fp-verify  pr-review        --from gh:frompt-org/stable@main   # the managed path: signature, expiry, serial, digest
+fp-resolve pr-review@latest --from gh:frompt-org/catalog@main   # this catalog's manifest, bytes verified against it
+fp-resolve pr-review@2.0.0  --from gh:frompt-org/catalog@main   # exactly that one
+fp-verify  pr-review        --from gh:frompt-org/catalog@main   # the managed path: signature, expiry, serial, digest
 ```
 
 `--from` is what makes it *this* catalog: without it a resolver reads whatever index sits in its own checkout, which is a different publisher. The pin mode you registered with is enforced by the resolver — `latest` floats; `version` and `digest` require a matching line in `fpa.lock`, and re-pinning is a change somebody reviews.
@@ -41,7 +41,7 @@ fp-verify  pr-review        --from gh:frompt-org/stable@main   # the managed pat
 
 ## What is in here
 
-Seeded from `reference` on 2026-09-09; the two will diverge. Versions are immutable: a change is a new version. Submissions are pull requests. Nothing is admitted, nothing is ranked, and being listed here makes a prompt no more official than one served from your own repo -- a catalog is a shape, not a privilege.
+Seeded on 2026-09-09 from the protocol repo's examples. Versions are immutable: a change is a new version. Submissions are pull requests. Nothing is admitted, nothing is ranked, and being listed here makes a prompt no more official than one served from your own repo -- a catalog is a shape, not a privilege.
 
 ## Assay
 
