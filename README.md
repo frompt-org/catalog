@@ -20,9 +20,9 @@ Once, in a workspace:
 ```bash
 # 1. bring the key in yourself -- copy allowed_signers from this page, a colleague, your MDM;
 #    never let a tool fetch it from the catalog it will be used to check
-fp-register gh:frompt-org/catalog@main --pin latest --trust ./frompt-catalog.allowed_signers
-# once public:
 fp-register https://raw.githubusercontent.com/frompt-org/catalog/main --pin latest --trust ./frompt-catalog.allowed_signers
+# or through the GitHub API, with your own credential:
+fp-register gh:frompt-org/catalog@main --pin latest --trust ./frompt-catalog.allowed_signers
 ```
 
 The key's fingerprint is `SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY`. The registration line records it, and a manifest later signed by any other key -- even one you also trust for another catalog -- is refused until you re-register on purpose.
