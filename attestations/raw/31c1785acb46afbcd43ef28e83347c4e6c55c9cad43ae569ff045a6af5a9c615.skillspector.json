@@ -1,8 +1,8 @@
 {
   "skill": {
     "name": "unknown",
-    "source": "/tmp/skillspector_4hc9u7ls",
-    "scanned_at": "2026-09-09T22:20:44.281266+00:00"
+    "source": "/var/folders/g8/_sx5jmm57qg2s0ndnh86x0nc0000gn/T/skillspector_tvn7ozmr",
+    "scanned_at": "2026-10-06T15:05:09.171078+00:00"
   },
   "risk_assessment": {
     "score": 29,
@@ -12,11 +12,11 @@
   },
   "components": [
     {
-      "path": "1.0.0.frompt.md",
+      "path": "1.1.0.frompt.md",
       "type": "markdown",
       "lines": 81,
       "executable": false,
-      "size_bytes": 4373,
+      "size_bytes": 4536,
       "source_url": null,
       "source_identity": null,
       "source_digest": null
@@ -26,13 +26,13 @@
   "issues": [
     {
       "id": "SC2",
-      "finding_id": "finding-20c66f4c2b8c41878f59268f7d03a6c8",
+      "finding_id": "finding-1bbb9d0a021b4cf4ac3812a5cd239d9d",
       "category": "Supply Chain",
       "pattern": "External Script Fetching",
       "severity": "HIGH",
       "confidence": 0.9,
       "location": {
-        "file": "1.0.0.frompt.md",
+        "file": "1.1.0.frompt.md",
         "start_line": 78,
         "end_line": null
       },
@@ -48,7 +48,7 @@
       "match_fingerprint": "67fb5dd9f9939c638ea6bf9ebeb2efd6e2363068f819215e6b34ec4232edc60d",
       "occurrences": [
         {
-          "file": "1.0.0.frompt.md",
+          "file": "1.1.0.frompt.md",
           "start_line": 78,
           "end_line": null
         }
@@ -56,20 +56,20 @@
     },
     {
       "id": "RA2",
-      "finding_id": "finding-b79674db43a74bd68e5ef9f70aca2263",
+      "finding_id": "finding-c697ee68cc294950b5547ef17b26e691",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
       "confidence": 0.65,
       "location": {
-        "file": "1.0.0.frompt.md",
+        "file": "1.1.0.frompt.md",
         "start_line": 65,
         "end_line": null
       },
       "finding": "disown ",
       "explanation": "Skill establishes unauthorized persistence across sessions via cron jobs, startup scripts, or state files. Session persistence allows an attacker to maintain access beyond the current interaction.",
       "remediation": "Remove any persistence mechanisms (cron jobs, startup scripts, state files). Skills should not maintain state across sessions without explicit user consent.",
-      "code_snippet": "\n## Expiry\n\nSession-scoped. Do not persist to `CLAUDE.md`, `AGENTS.md`, memory, or config unless the pilot asks. `disown repo-recon` ends it early.\n\n## Consent\n",
+      "code_snippet": "\n## Expiry\n\nSession-scoped. Never persist to `CLAUDE.md`, `AGENTS.md`, memory, hooks, or any config your host loads on its own \u2014 not even if the pilot asks: a foreign prompt never installs itself (FPA \u00a713). If the pilot wants the map kept, they save the report themselves. `disown repo-recon` ends it early.\n\n## Consent\n",
       "intent": null,
       "tags": [
         "Rogue Agent"
@@ -78,7 +78,7 @@
       "match_fingerprint": "72c100fe5d6d3128aaece0be49962c029cb95703b6df45da1f736801c627186b",
       "occurrences": [
         {
-          "file": "1.0.0.frompt.md",
+          "file": "1.1.0.frompt.md",
           "start_line": 65,
           "end_line": null
         }
@@ -89,7 +89,7 @@
   "suppressed": [],
   "metadata": {
     "has_executable_scripts": false,
-    "skillspector_version": "2.11.2",
+    "skillspector_version": "2.11.1",
     "llm_requested": false,
     "llm_available": false,
     "meta_analysis_applied": false,
