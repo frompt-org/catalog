@@ -15,7 +15,15 @@ attestations/<digest>.*.json      what an assay observed about that exact docume
 
 ## Registering
 
-Once, in a workspace:
+The tools live in the protocol repository; there is nothing to install beyond a clone:
+
+```bash
+git clone https://github.com/frompt-org/protocol ~/frompt-protocol
+export PATH="$HOME/frompt-protocol/bin:$PATH"
+```
+
+Registration is recorded in that checkout's `fpa.registered`, so the checkout is the workspace:
+one clone per set of agents that should share a consent record. Then, once:
 
 ```bash
 # 1. bring the key in yourself -- copy allowed_signers from this page, a colleague, your MDM;
