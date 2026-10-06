@@ -30,7 +30,9 @@ jobs:
       - name: attest
         run: |
           for f in ${{ steps.changed.outputs.docs }}; do
-            [ -f "$f" ] && bin/fp-assay "$f" -o attestations
+            # A removed document (a revocation) is in the diff too; skip it rather
+            # than let the false test end the step under bash -e.
+            if [ -f "$f" ]; then bin/fp-assay "$f" -o attestations; fi
           done
       - name: prune attestations for bytes this catalog no longer serves
         run: |
