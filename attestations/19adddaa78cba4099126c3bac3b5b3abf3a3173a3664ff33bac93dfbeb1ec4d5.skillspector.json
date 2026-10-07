@@ -1,0 +1,39 @@
+{
+ "attestation": 1,
+ "authority": "skillspector",
+ "authority_version": "SkillSpector v2.11.1",
+ "coverage_percent": 100.0,
+ "digest": "19adddaa78cba4099126c3bac3b5b3abf3a3173a3664ff33bac93dfbeb1ec4d5",
+ "id": "ghost-in-the-machine",
+ "issues": [
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 32,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 79,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Supply Chain",
+   "confidence": 0.9,
+   "id": "SC2",
+   "line": 121,
+   "rule": null,
+   "severity": "HIGH"
+  }
+ ],
+ "kind": "static-scan",
+ "observed_at": "2026-10-07T10:05:28Z",
+ "score": 32,
+ "severity": "MEDIUM",
+ "version": "1.0.0"
+}
