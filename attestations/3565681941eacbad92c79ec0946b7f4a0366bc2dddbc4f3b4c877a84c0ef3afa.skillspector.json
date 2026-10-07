@@ -1,0 +1,55 @@
+{
+ "attestation": 1,
+ "authority": "skillspector",
+ "authority_version": "SkillSpector v2.11.1",
+ "coverage_percent": 100.0,
+ "digest": "3565681941eacbad92c79ec0946b7f4a0366bc2dddbc4f3b4c877a84c0ef3afa",
+ "id": "ghost-interview",
+ "issues": [
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 10,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 46,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 63,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Rogue Agent",
+   "confidence": 0.65,
+   "id": "RA2",
+   "line": 97,
+   "rule": null,
+   "severity": "MEDIUM"
+  },
+  {
+   "category": "Supply Chain",
+   "confidence": 0.9,
+   "id": "SC2",
+   "line": 110,
+   "rule": null,
+   "severity": "HIGH"
+  }
+ ],
+ "kind": "static-scan",
+ "observed_at": "2026-10-07T07:34:52Z",
+ "score": 33,
+ "severity": "MEDIUM",
+ "version": "1.0.0"
+}

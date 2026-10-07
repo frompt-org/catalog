@@ -1,7 +1,7 @@
 {
   "base": "https://raw.githubusercontent.com/frompt-org/catalog/main/prompts",
   "manifest_version": 2,
-  "not_after": "2026-11-05T15:05:25Z",
+  "not_after": "2026-11-06T07:34:49Z",
   "prompts": [
     {
       "id": "help-me",
@@ -205,8 +205,25 @@
           "version": "2.1.0"
         }
       ]
+    },
+    {
+      "id": "ghost-interview",
+      "latest": "1.0.0",
+      "versions": [
+        {
+          "allow": "read:conversation",
+          "ceremony": "standard",
+          "contexts": "interactive",
+          "deny": "read:files, read:git, write:files, run:shell-ro, net:get, net:post, secrets:read, pkg:install",
+          "digest": "3565681941eacbad92c79ec0946b7f4a0366bc2dddbc4f3b4c877a84c0ef3afa",
+          "file": "ghost-interview/1.0.0.frompt.md",
+          "flow": "interview",
+          "persistence": "none",
+          "version": "1.0.0"
+        }
+      ]
     }
   ],
   "protocol": "FOREIGN-PROMPT v2",
-  "serial": 5
+  "serial": 6
 }
