@@ -1,7 +1,7 @@
 {
  "attestation": 1,
  "authority": "skillspector",
- "authority_version": "SkillSpector v2.11.1",
+ "authority_version": "SkillSpector v2.12.0",
  "coverage_percent": 100.0,
  "digest": "19adddaa78cba4099126c3bac3b5b3abf3a3173a3664ff33bac93dfbeb1ec4d5",
  "id": "ghost-in-the-machine",
@@ -32,7 +32,7 @@
   }
  ],
  "kind": "static-scan",
- "observed_at": "2026-10-07T10:05:28Z",
+ "observed_at": "2026-10-07T10:05:47Z",
  "score": 32,
  "severity": "MEDIUM",
  "version": "1.0.0"
