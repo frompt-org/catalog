@@ -1,8 +1,8 @@
 {
   "skill": {
     "name": "unknown",
-    "source": "/var/folders/g8/_sx5jmm57qg2s0ndnh86x0nc0000gn/T/skillspector_3n1eve6w",
-    "scanned_at": "2026-10-07T07:34:52.415245+00:00"
+    "source": "/tmp/skillspector_qw52_knu",
+    "scanned_at": "2026-10-07T07:35:12.456778+00:00"
   },
   "risk_assessment": {
     "score": 33,
@@ -26,7 +26,7 @@
   "issues": [
     {
       "id": "SC2",
-      "finding_id": "finding-b83116f2150d43ffa180261f9640f596",
+      "finding_id": "finding-d4de22b18d0e489b888c3b409d947be8",
       "category": "Supply Chain",
       "pattern": "External Script Fetching",
       "severity": "HIGH",
@@ -34,7 +34,8 @@
       "location": {
         "file": "1.0.0.frompt.md",
         "start_line": 110,
-        "end_line": null
+        "end_line": null,
+        "start_column": 0
       },
       "finding": "curl -fsS <url> | sh",
       "explanation": "Remote code is downloaded and executed. This bypasses code review and could introduce malicious code.",
@@ -50,13 +51,14 @@
         {
           "file": "1.0.0.frompt.md",
           "start_line": 110,
-          "end_line": null
+          "end_line": null,
+          "start_column": 0
         }
       ]
     },
     {
       "id": "RA2",
-      "finding_id": "finding-ec134fbab82941c7bc8e0028d5246de3",
+      "finding_id": "finding-00b2e472eedd429384e1a4629e1dba55",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
@@ -64,7 +66,8 @@
       "location": {
         "file": "1.0.0.frompt.md",
         "start_line": 10,
-        "end_line": null
+        "end_line": null,
+        "start_column": 45
       },
       "finding": "disown ",
       "explanation": "Skill establishes unauthorized persistence across sessions via cron jobs, startup scripts, or state files. Session persistence allows an attacker to maintain access beyond the current interaction.",
@@ -80,13 +83,14 @@
         {
           "file": "1.0.0.frompt.md",
           "start_line": 10,
-          "end_line": null
+          "end_line": null,
+          "start_column": 45
         }
       ]
     },
     {
       "id": "RA2",
-      "finding_id": "finding-ec134fbab82941c7bc8e0028d5246de3",
+      "finding_id": "finding-00b2e472eedd429384e1a4629e1dba55",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
@@ -94,7 +98,8 @@
       "location": {
         "file": "1.0.0.frompt.md",
         "start_line": 46,
-        "end_line": null
+        "end_line": null,
+        "start_column": 63
       },
       "finding": "disown ",
       "explanation": "Skill establishes unauthorized persistence across sessions via cron jobs, startup scripts, or state files. Session persistence allows an attacker to maintain access beyond the current interaction.",
@@ -110,13 +115,14 @@
         {
           "file": "1.0.0.frompt.md",
           "start_line": 46,
-          "end_line": null
+          "end_line": null,
+          "start_column": 63
         }
       ]
     },
     {
       "id": "RA2",
-      "finding_id": "finding-ec134fbab82941c7bc8e0028d5246de3",
+      "finding_id": "finding-00b2e472eedd429384e1a4629e1dba55",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
@@ -124,7 +130,8 @@
       "location": {
         "file": "1.0.0.frompt.md",
         "start_line": 63,
-        "end_line": null
+        "end_line": null,
+        "start_column": 27
       },
       "finding": "disown ",
       "explanation": "Skill establishes unauthorized persistence across sessions via cron jobs, startup scripts, or state files. Session persistence allows an attacker to maintain access beyond the current interaction.",
@@ -140,13 +147,14 @@
         {
           "file": "1.0.0.frompt.md",
           "start_line": 63,
-          "end_line": null
+          "end_line": null,
+          "start_column": 27
         }
       ]
     },
     {
       "id": "RA2",
-      "finding_id": "finding-ec134fbab82941c7bc8e0028d5246de3",
+      "finding_id": "finding-00b2e472eedd429384e1a4629e1dba55",
       "category": "Rogue Agent",
       "pattern": "Session Persistence",
       "severity": "MEDIUM",
@@ -154,7 +162,8 @@
       "location": {
         "file": "1.0.0.frompt.md",
         "start_line": 97,
-        "end_line": null
+        "end_line": null,
+        "start_column": 36
       },
       "finding": "disown ",
       "explanation": "Skill establishes unauthorized persistence across sessions via cron jobs, startup scripts, or state files. Session persistence allows an attacker to maintain access beyond the current interaction.",
@@ -170,7 +179,8 @@
         {
           "file": "1.0.0.frompt.md",
           "start_line": 97,
-          "end_line": null
+          "end_line": null,
+          "start_column": 36
         }
       ]
     }
@@ -179,11 +189,123 @@
   "suppressed": [],
   "metadata": {
     "has_executable_scripts": false,
-    "skillspector_version": "2.11.1",
+    "skillspector_version": "2.12.0",
     "llm_requested": false,
     "llm_available": false,
     "meta_analysis_applied": false,
     "inference_usage": [],
+    "llm_provenance": {
+      "schema_version": 1,
+      "provider": {
+        "configured_adapter": "unknown",
+        "resolved_adapter": "unknown",
+        "effective_adapter": "not_applicable",
+        "effective_adapters": [],
+        "service": "unknown",
+        "routing": {
+          "deployment_override": null,
+          "deployment_source": "unknown",
+          "api_version": null,
+          "api_version_source": "unknown"
+        }
+      },
+      "analyzers": [
+        {
+          "analyzer_id": "mcp_tool_poisoning",
+          "model": "z-ai/glm-5.3",
+          "model_source": "resolved_configuration",
+          "analyzer_revision": {
+            "value": "2.12.0",
+            "source": "skillspector_package",
+            "source_revision": {
+              "value": "b359c66d06e6fca7c31b71887ffb9ebca7db5848",
+              "source": "package_vcs_metadata"
+            }
+          }
+        },
+        {
+          "analyzer_id": "semantic_developer_intent",
+          "model": "z-ai/glm-5.3",
+          "model_source": "resolved_configuration",
+          "analyzer_revision": {
+            "value": "2.12.0",
+            "source": "skillspector_package",
+            "source_revision": {
+              "value": "b359c66d06e6fca7c31b71887ffb9ebca7db5848",
+              "source": "package_vcs_metadata"
+            }
+          }
+        },
+        {
+          "analyzer_id": "semantic_quality_policy",
+          "model": "z-ai/glm-5.3",
+          "model_source": "resolved_configuration",
+          "analyzer_revision": {
+            "value": "2.12.0",
+            "source": "skillspector_package",
+            "source_revision": {
+              "value": "b359c66d06e6fca7c31b71887ffb9ebca7db5848",
+              "source": "package_vcs_metadata"
+            }
+          }
+        },
+        {
+          "analyzer_id": "semantic_security_discovery",
+          "model": "z-ai/glm-5.3",
+          "model_source": "resolved_configuration",
+          "analyzer_revision": {
+            "value": "2.12.0",
+            "source": "skillspector_package",
+            "source_revision": {
+              "value": "b359c66d06e6fca7c31b71887ffb9ebca7db5848",
+              "source": "package_vcs_metadata"
+            }
+          }
+        },
+        {
+          "analyzer_id": "meta_analyzer",
+          "model": "z-ai/glm-5.3",
+          "model_source": "resolved_configuration",
+          "analyzer_revision": {
+            "value": "2.12.0",
+            "source": "skillspector_package",
+            "source_revision": {
+              "value": "b359c66d06e6fca7c31b71887ffb9ebca7db5848",
+              "source": "package_vcs_metadata"
+            }
+          }
+        }
+      ],
+      "sampling": {
+        "temperature": {
+          "requested": null,
+          "source": "provider_default",
+          "forwarded_to_client": null,
+          "adapter_support": false,
+          "provider_support": "unknown"
+        },
+        "seed": {
+          "requested": null,
+          "source": "unset",
+          "forwarded_to_client": null,
+          "adapter_support": false,
+          "provider_support": "unknown"
+        },
+        "reasoning_effort": {
+          "requested": null,
+          "source": "provider_default",
+          "forwarded_to_client": null,
+          "adapter_support": false,
+          "provider_support": "unknown"
+        }
+      },
+      "determinism": {
+        "classification": "not_applicable",
+        "control_status": "not_applied",
+        "provider_guarantee": false,
+        "reason": "LLM analysis was not executed for this scan."
+      }
+    },
     "filtering_mode": "heuristic"
   },
   "execution_successful": true,
@@ -282,6 +404,42 @@
       },
       {
         "analyzer_id": "meta_analyzer",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "partial": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "semantic_developer_intent",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "partial": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "semantic_quality_policy",
+        "status": "disabled",
+        "planned_work": 0,
+        "completed": 0,
+        "partial": 0,
+        "skipped": 0,
+        "failed": 0,
+        "unaccounted": 0,
+        "reason_code": "disabled_by_configuration",
+        "message": "Analyzer was disabled by the requested configuration."
+      },
+      {
+        "analyzer_id": "semantic_security_discovery",
         "status": "disabled",
         "planned_work": 0,
         "completed": 0,

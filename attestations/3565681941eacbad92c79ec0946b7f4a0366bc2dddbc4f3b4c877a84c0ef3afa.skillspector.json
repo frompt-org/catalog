@@ -1,7 +1,7 @@
 {
  "attestation": 1,
  "authority": "skillspector",
- "authority_version": "SkillSpector v2.11.1",
+ "authority_version": "SkillSpector v2.12.0",
  "coverage_percent": 100.0,
  "digest": "3565681941eacbad92c79ec0946b7f4a0366bc2dddbc4f3b4c877a84c0ef3afa",
  "id": "ghost-interview",
@@ -48,7 +48,7 @@
   }
  ],
  "kind": "static-scan",
- "observed_at": "2026-10-07T07:34:52Z",
+ "observed_at": "2026-10-07T07:35:13Z",
  "score": 33,
  "severity": "MEDIUM",
  "version": "1.0.0"
