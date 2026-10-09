@@ -56,3 +56,7 @@ Seeded on 2026-09-09 from the protocol repo's examples. Versions are immutable: 
 Every document here is scanned at publish time and the scanner's raw output is stored beside it, keyed by digest. That is an **attestation**: an observation about these exact bytes, as data. It is not a verdict and there is no score threshold. Read the observation, then read the document; the second is the one that catches things.
 
 Protocol, tools, and the rest: [`frompt-org/frompt`](https://github.com/frompt-org/frompt).
+
+## License
+
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Copyright 2026 Ramazan Polat.
