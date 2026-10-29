@@ -8,7 +8,8 @@ The frompts the documentation adopts as examples are published by [`protocol`](h
 index.json                        the signed manifest; a client fetches this first
 index.json.sig
 INDEX.md                          the same thing, for people -- digests, never consent sentences
-allowed_signers                   the key, identity frompt-catalog -- read it here once, pin it elsewhere
+allowed_signers                   the key, identity frompt-catalog -- fetched once, checked against a fingerprint you hold
+frompt-catalog.json               where this catalog is served from, its signing identity, its summaries
 prompts/<id>/<version>.frompt.md  the documents, immutable
 attestations/<digest>.*.json      what an assay observed about that exact document (see below)
 ```
@@ -20,22 +21,26 @@ The tools live in the protocol repository; there is nothing to install beyond a 
 ```bash
 git clone https://github.com/frompt-org/protocol ~/frompt-protocol
 export PATH="$HOME/frompt-protocol/bin:$PATH"
+export FPA_WORKSPACE="$HOME/.config/frompt"   # your trust record: keys, registrations, pins
 ```
 
-Registration is recorded in that checkout's `fpa.registered`, so the checkout is the workspace:
-one clone per set of agents that should share a consent record. Then, once:
+`FPA_WORKSPACE` is where your consent lives -- one per set of agents that should share it. Without
+it, the tools use their own checkout. Then, once:
 
 ```bash
-# 1. bring the key in yourself -- copy allowed_signers from this page, a colleague, your MDM;
-#    never let a tool fetch it from the catalog it will be used to check
-fp-register https://raw.githubusercontent.com/frompt-org/catalog/main --pin latest --trust ./frompt-catalog.allowed_signers
+fp-register https://raw.githubusercontent.com/frompt-org/catalog/main --key SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY --pin latest
 # or through the GitHub API, with your own credential:
-fp-register gh:frompt-org/catalog@main --pin latest --trust ./frompt-catalog.allowed_signers
+fp-register gh:frompt-org/catalog@main --key SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY --pin latest
 ```
 
-The key's fingerprint is `SHA256:x4Z+wsX1wVrBt5SV/NWWgPfapXlpcmSk3rqZ36Y/rKY`. The registration line records it, and a manifest later signed by any other key -- even one you also trust for another catalog -- is refused until you re-register on purpose.
+`--key` fetches this catalog's `allowed_signers` and trusts the key in it only if its fingerprint
+is the one you typed (FPA.md M7a). **Check that fingerprint somewhere other than this repository**
+-- the protocol's README, a colleague, your MDM. A fingerprint read from the catalog it vouches for
+proves only that the two agree with each other.
 
-That writes one line to `fpa.registered` -- catalog, key fingerprint, pin mode, when, who -- and that line is the consent. From then on:
+That writes one line to `fpa.registered` -- catalog, key fingerprint, pin mode, when, who -- and that
+line is the consent. A manifest later signed by any other key, even one you also trust for another
+catalog, is refused until you re-register on purpose. From then on:
 
 ```bash
 fp-resolve pr-review@latest --from gh:frompt-org/catalog@main   # this catalog's manifest, bytes verified against it
@@ -43,13 +48,14 @@ fp-resolve pr-review@2.0.0  --from gh:frompt-org/catalog@main   # exactly that o
 fp-verify  pr-review        --from gh:frompt-org/catalog@main   # the managed path: signature, expiry, serial, digest
 ```
 
-`--from` is what makes it *this* catalog: without it a resolver reads whatever index sits in its own checkout, which is a different publisher. The pin mode you registered with is enforced by the resolver — `latest` floats; `version` and `digest` require a matching line in `fpa.lock`, and re-pinning is a change somebody reviews.
-
-**Do not take `allowed_signers` from this repository at verification time.** A key fetched from the same host as the signature it validates proves only that the two agree with each other. Copy it once, out of band, and pin it.
+`--from` is what makes it *this* catalog: without it a resolver reads the catalog it is standing in, or
+the tools' own, which is a different publisher. The pin mode you registered with is enforced by the resolver —
+`latest` floats; `version` and `digest` require a matching line in `fpa.lock`
+(`fp-lock --update <id> --from <this catalog>`), and re-pinning is a change somebody reviews.
 
 ## What is in here
 
-Seeded on 2026-09-09 from the protocol repo's examples. Versions are immutable: a change is a new version. Submissions are pull requests. Nothing is admitted, nothing is ranked, and being listed here makes a prompt no more official than one served from your own repo -- a catalog is a shape, not a privilege.
+Seeded on 2026-09-09 from the protocol repo's examples. Versions are immutable: a change is a new version. Submissions are pull requests; a maintainer holding the key runs `fp-index && fp-sign` in a clone of this repository, with the protocol's tools on `PATH`. Nothing is admitted, nothing is ranked, and being listed here makes a prompt no more official than one served from your own repo -- a catalog is a shape, not a privilege.
 
 ## Assay
 

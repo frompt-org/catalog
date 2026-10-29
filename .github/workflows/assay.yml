@@ -3,6 +3,10 @@
 # This is an authority in the FPA.md 15 sense: observations keyed by digest, as
 # data, never a verdict. The job never fails on a score. It fails only when it
 # could not scan, because an attestation for a partial scan is a lie.
+#
+# The tools come from frompt-org/protocol, pinned to a commit, not copied in here:
+# a copy drifts, and a catalog should not carry the code that checks it. Moving the
+# pin is a reviewed change like any other.
 name: assay
 on:
   push:
@@ -19,6 +23,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: the tools, pinned
+        uses: actions/checkout@v4
+        with:
+          repository: frompt-org/protocol
+          ref: 11c44b25afcd9ef8ef220862b3feee819980ac8f
+          path: .frompt-tools
       - uses: astral-sh/setup-uv@v3
       - run: uv tool install git+https://github.com/NVIDIA/skillspector.git
       - name: changed documents
@@ -32,7 +42,7 @@ jobs:
           for f in ${{ steps.changed.outputs.docs }}; do
             # A removed document (a revocation) is in the diff too; skip it rather
             # than let the false test end the step under bash -e.
-            if [ -f "$f" ]; then bin/fp-assay "$f" -o attestations; fi
+            if [ -f "$f" ]; then .frompt-tools/bin/fp-assay "$f" -o attestations; fi
           done
       - name: prune attestations for bytes this catalog no longer serves
         run: |
